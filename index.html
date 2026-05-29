@@ -1,0 +1,1062 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Verdina 3d — Zahour Al-Omara, Dalingat</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Cairo:wght@300;400;600;700;900&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://unpkg.com/three@0.128.0/build/three.min.js"></script>
+<style>
+:root {
+  --bg:        #04080f;
+  --panel:     #070d1a;
+  --card:      #0c1425;
+  --border:    #162040;
+  --accent:    #00e5b0;
+  --accent2:   #4f8eff;
+  --accent3:   #ff6b35;
+  --warn:      #f5a623;
+  --danger:    #ff3d57;
+  --text:      #dde8ff;
+  --muted:     #4a6080;
+  --green:     #22c55e;
+  --gold:      #ffd166;
+}
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: 'Cairo', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+/* ─── 3D CANVAS BG ─── */
+#three-canvas {
+  position: fixed;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.55;
+}
+
+/* ─── HEADER ─── */
+header {
+  background: rgba(42, 59, 88, 0.521);
+  border-bottom: 1px solid var(--border);
+  padding: 0 24px;
+  height: 62px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  position: relative;
+  z-index: 1000;
+  backdrop-filter: blur(16px);
+}
+header::after {
+  content:'';
+  position:absolute;
+  bottom:0; left:0; right:0; height:2px;
+  background: linear-gradient(90deg, transparent, var(--accent), var(--accent2), transparent);
+}
+.logo { display:flex; align-items:center; gap:14px; }
+.logo-icon {
+  width:42px; height:42px;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  border-radius:10px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:20px;
+  box-shadow: 0 0 20px rgba(0,229,176,0.3);
+  position: relative;
+  overflow: hidden;
+}
+.logo-icon::after {
+  content: '';
+  position: absolute;
+  top: -50%; left: -50%;
+  width: 200%; height: 200%;
+  background: linear-gradient(45deg, transparent 40%, rgba(255,255,255,0.15) 50%, transparent 60%);
+  animation: shimmer 3s infinite;
+}
+@keyframes shimmer { 0%{transform:translateX(-100%) translateY(-100%)} 100%{transform:translateX(100%) translateY(100%)} }
+.brand h1 { font-family:'Syne',sans-serif; font-size:18px; font-weight:800; color:#fff; letter-spacing:1px; }
+.brand p  { font-size:11px; color:#fafafa; margin-top:-2px; }
+.header-stats { display:flex; gap:20px; }
+.hstat { text-align:center; }
+.hstat-val { font-size:17px; font-weight:700; color:var(--accent); font-family:'JetBrains Mono',monospace; }
+.hstat-lbl { font-size:10px; color:#fafafa; }
+.location-pill {
+  display:flex; align-items:center; gap:8px;
+  background: rgba(0,229,176,0.08);
+  border: 1px solid rgba(0,229,176,0.2);
+  border-radius:20px;
+  padding: 6px 14px;
+  font-size:12px; color:var(--accent);
+}
+.pulse-dot {
+  width:8px; height:8px; border-radius:50%;
+  background:var(--accent);
+  animation: pulse 2s infinite;
+}
+@keyframes pulse { 0%,100%{box-shadow:0 0 0 0 rgba(0,229,176,.5)} 50%{box-shadow:0 0 0 6px rgba(0,229,176,0)} }
+
+/* ─── MAIN LAYOUT ─── */
+.main { display:flex; flex:1; overflow:hidden; position:relative; z-index:1; }
+
+/* ─── SIDEBAR ─── */
+.sidebar {
+  width: 360px; min-width:360px;
+  background: rgba(7,13,26,0.88);
+  border-left: 1px solid var(--border);
+  display:flex; flex-direction:column; overflow:hidden;
+  backdrop-filter: blur(12px);
+}
+.sidebar-tabs { display:flex; border-bottom:1px solid var(--border); flex-shrink:0; }
+.tab-btn {
+  flex:1; padding:12px 4px;
+  background:none; border:none;
+  color:#fafafa; font-family:'Cairo',sans-serif; font-size:11px;
+  cursor:pointer; transition:all .2s;
+  border-bottom:2px solid transparent; margin-bottom:-1px;
+}
+.tab-btn.active { color:var(--accent); border-bottom-color:var(--accent); background:rgba(0,229,176,.05); }
+.tab-content { display:none; flex-direction:column; overflow:hidden; flex:1; }
+.tab-content.active { display:flex; }
+
+/* ─── SAMPLE LIST ─── */
+.sample-list { overflow-y:auto; flex:1; padding:8px; }
+.sample-list::-webkit-scrollbar { width:3px; }
+.sample-list::-webkit-scrollbar-thumb { background:var(--border); border-radius:4px; }
+.sample-item {
+  padding:10px 12px; border-radius:10px; cursor:pointer;
+  display:flex; align-items:center; gap:10px; margin-bottom:4px;
+  border:1px solid transparent; transition:all .2s;
+  background: rgba(12,20,37,0.6);
+}
+.sample-item:hover { background:rgba(0,229,176,.06); border-:rgba(0,229,176,.2); transform:translateX(-2px); }
+.sample-item.selected { background:rgba(0,229,176,.1); border-color:var(--accent); }
+.sample-num {
+  width:30px; height:30px; border-radius:8px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:12px; font-weight:700; color:#000; flex-shrink:0;
+}
+.sample-info { flex:1; min-width:0; }
+.sample-info h4 { font-size:13px; font-weight:600; }
+.sample-info p  { font-size:11px; color:var(--muted); margin-top:1px; }
+.sample-badge { font-family:'JetBrains Mono',monospace; font-size:11px; padding:2px 7px; border-radius:4px; font-weight:600; }
+
+/* ─── DETAIL PANEL ─── */
+.detail-panel { overflow-y:auto; flex:1; padding:12px; }
+.detail-panel::-webkit-scrollbar { width:3px; }
+.detail-panel::-webkit-scrollbar-thumb { background:var(--border); border-radius:4px; }
+.detail-header {
+  background: linear-gradient(135deg, rgba(0,229,176,.1), rgba(79,142,255,.1));
+  border:1px solid var(--border); border-radius:12px;
+  padding:14px; margin-bottom:12px;
+  position:relative; overflow:hidden;
+}
+.detail-header::before {
+  content:''; position:absolute; top:0; right:0;
+  width:100px; height:100px;
+  background: radial-gradient(circle, rgba(0,229,176,.1), transparent);
+  border-radius:50%;
+}
+.detail-header h2 { font-size:16px; font-weight:700; color:var(--accent); font-family:'Syne',sans-serif; }
+.detail-header p  { font-size:11px; color:var(--muted); margin-top:3px; font-family:'JetBrains Mono',monospace; }
+
+.section-title {
+  font-size:11px; font-weight:700; color:#fafafa;
+  text-transform:uppercase; letter-spacing:1px;
+  margin:12px 0 6px; display:flex; align-items:center; gap:6px;
+}
+.section-title::after { content:''; flex:1; height:1px; background:var(--border); }
+
+.params-grid { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+.param-card {
+  background:var(--card); border:1px solid var(--border);
+  border-radius:10px; padding:10px 12px;
+  position:relative; overflow:hidden; transition:all .2s;
+}
+.param-card:hover { border-color:rgba(0,229,176,.3); }
+.param-card::before { content:''; position:absolute; top:0; right:0; width:3px; height:100%; border-radius:0 10px 10px 0; }
+.param-card.good::before  { background:var(--green); }
+.param-card.warn::before  { background:var(--warn); }
+.param-card.bad::before   { background:var(--danger); }
+.param-card.neutral::before { background:var(--accent2); }
+.param-label { font-size:10px; color:var(--muted); margin-bottom:2px; }
+.param-value { font-size:16px; font-weight:700; font-family:'JetBrains Mono',monospace; }
+.param-unit  { font-size:10px; color:var(--muted); margin-top:1px; }
+.param-bar-wrap { margin-top:5px; height:3px; background:var(--border); border-radius:2px; overflow:hidden; }
+.param-bar { height:100%; border-radius:2px; transition:width .8s cubic-bezier(.4,0,.2,1); }
+
+.ions-table { width:100%; border-collapse:collapse; font-size:12px; }
+.ions-table th { background:rgba(255,255,255,.03); padding:6px 8px; text-align:right; font-weight:600; color:var(--muted); font-size:11px; }
+.ions-table td { padding:6px 8px; border-top:1px solid var(--border); font-family:'JetBrains Mono',monospace; font-size:12px; }
+.ions-table tr:hover td { background:rgba(255,255,255,.02); }
+
+.status-badge { padding:1px 7px; border-radius:4px; font-size:10px; font-weight:700; font-family:'Cairo',sans-serif; }
+.status-good    { background:rgba(34,197,94,.15);  color:var(--green); }
+.status-warn    { background:rgba(245,166,35,.15); color:var(--warn); }
+.status-bad     { background:rgba(255,61,87,.15);  color:var(--danger); }
+.status-neutral { background:rgba(79,142,255,.15); color:var(--accent2); }
+
+/* ─── CROP SUITABILITY TABLE ─── */
+.crop-grid { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+.crop-card {
+  background:var(--card); border:1px solid var(--border); border-radius:8px;
+  padding:8px 10px; display:flex; align-items:center; gap:8px; transition:all .2s;
+}
+.crop-card:hover { border-color:rgba(0,229,176,.25); transform:scale(1.01); }
+.crop-icon { font-size:18px; }
+.crop-info { flex:1; min-width:0; }
+.crop-name { font-size:11px; font-weight:700; }
+.crop-class { font-size:10px; font-family:'JetBrains Mono',monospace; margin-top:1px; }
+.crop-s1 { color:var(--green); }
+.crop-s2 { color:var(--accent); }
+.crop-s3 { color:var(--warn); }
+.crop-s4 { color:var(--danger); }
+.crop-ns { color:var(--muted); }
+
+/* ─── LU/LC TABLE ─── */
+.lu-table { width:100%; border-collapse:collapse; font-size:12px; margin-bottom:8px; }
+.lu-table th { background:rgba(0,229,176,.08); padding:7px 10px; text-align:right; font-size:11px; color:var(--accent); border-bottom:1px solid var(--border); }
+.lu-table td { padding:7px 10px; border-top:1px solid rgba(255,255,255,.04); font-family:'JetBrains Mono',monospace; font-size:11px; }
+.lu-bar-cell { min-width:80px; }
+.lu-mini-bar { height:6px; border-radius:3px; background:var(--accent); transition:width .8s; }
+.lu-veg  .lu-mini-bar { background:var(--green); }
+.lu-soil .lu-mini-bar { background:var(--warn); }
+
+.placeholder-msg { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; color:var(--muted); gap:10px; padding:40px 20px; text-align:center; }
+.placeholder-msg .big-icon { font-size:48px; opacity:.4; }
+.placeholder-msg p { font-size:13px; line-height:1.6; }
+
+/* ─── MAP ─── */
+#map { flex:1; position:relative; z-index:1; }
+.map-wrap { position:relative; flex:1; display:flex; }
+
+/* ─── CONTROLS ─── */
+.layer-control {
+  position:absolute; top:14px; right:14px; z-index:800;
+  background:rgba(4,8,15,.92); border:1px solid var(--border);
+  border-radius:12px; padding:12px 16px; backdrop-filter:blur(16px); min-width:170px;
+}
+.layer-title { font-size:11px; font-weight:700; color:#fafafa; text-transform:uppercase; letter-spacing:1px; margin-bottom:10px; }
+.layer-opt { display:flex; align-items:center; gap:8px; padding:5px 0; cursor:pointer; font-size:12px; }
+.layer-opt input[type=radio] { accent-color:var(--accent); cursor:pointer; }
+
+.legend-bar {
+  position:absolute; bottom:36px; right:14px; z-index:800;
+  background:rgba(4,8,15,.92); border:1px solid var(--border);
+  border-radius:12px; padding:12px 16px; backdrop-filter:blur(16px); min-width:160px;
+}
+.legend-title { font-size:10px; color:#fafafa; margin-bottom:6px; font-weight:700; text-transform:uppercase; }
+.legend-item { display:flex; align-items:center; gap:7px; font-size:11px; margin-bottom:4px; }
+.legend-dot { width:12px; height:12px; border-radius:50%; flex-shrink:0; }
+
+/* ─── 3D VIEW PANEL ─── */
+.view3d-btn {
+  position:absolute; top:14px; left:14px; z-index:800;
+  background:rgba(0,229,176,.1); border:1px solid rgba(0,229,176,.3);
+  border-radius:8px; padding:8px 14px; color:var(--accent);
+  font-family:'Cairo',sans-serif; font-size:12px; font-weight:700;
+  cursor:pointer; transition:all .2s; backdrop-filter:blur(8px);
+  display:flex; align-items:center; gap:6px;
+}
+.view3d-btn:hover { background:rgba(0,229,176,.2); box-shadow:0 0 20px rgba(0,229,176,.2); }
+
+/* ─── LEAFLET TOOLTIP ─── */
+.leaflet-tooltip {
+  background:rgba(4,8,15,.96) !important; border:1px solid var(--border) !important;
+  color:var(--text) !important; font-family:'Cairo',sans-serif !important;
+  font-size:12px !important; border-radius:10px !important;
+  padding:10px 14px !important; box-shadow:0 8px 32px rgba(0,0,0,.6) !important;
+}
+.leaflet-tooltip::before { display:none !important; }
+.tt-title { font-weight:700; color:var(--accent); font-size:13px; margin-bottom:5px; font-family:'Syne',sans-serif; }
+.tt-row   { display:flex; justify-content:space-between; gap:16px; font-size:11px; color:var(--muted); }
+.tt-val   { color:var(--text); font-weight:600; font-family:'JetBrains Mono',monospace; }
+
+/* ─── ADD FORM ─── */
+.add-form { padding:12px; overflow-y:auto; flex:1; }
+.add-form::-webkit-scrollbar { width:3px; }
+.add-form::-webkit-scrollbar-thumb { background:var(--border); border-radius:4px; }
+.form-group { margin-bottom:10px; }
+.form-group label { display:block; font-size:11px; color:var(--muted); margin-bottom:4px; font-weight:600; }
+.form-group input, .form-group select {
+  width:100%; background:var(--card); border:1px solid var(--border);
+  border-radius:8px; padding:8px 10px; color:var(--text);
+  font-family:'Cairo',sans-serif; font-size:13px; outline:none; transition:border-color .2s;
+}
+.form-group input:focus, .form-group select:focus { border-color:var(--accent); box-shadow:0 0 0 2px rgba(0,229,176,.1); }
+.form-row { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.btn-add {
+  width:100%; padding:11px; background:linear-gradient(135deg,var(--accent),var(--accent2));
+  border:none; border-radius:10px; color:#00000079; font-family:'Cairo',sans-serif;
+  font-size:14px; font-weight:700; cursor:pointer; transition:all .2s; margin-top:6px;
+}
+.btn-add:hover { transform:translateY(-1px); box-shadow:0 6px 24px rgba(0,229,176,.3); }
+.form-msg { font-size:12px; text-align:center; margin-top:8px; min-height:18px; }
+.add-form .section-title { margin-top:14px; }
+
+/* ─── STATS TAB ─── */
+.stats-panel { overflow-y:auto; flex:1; padding:12px; }
+.stats-panel::-webkit-scrollbar { width:3px; }
+.stats-panel::-webkit-scrollbar-thumb { background:var(--border); border-radius:4px; }
+.big-stat-card {
+  background: linear-gradient(135deg, rgba(0, 229, 176, 0.137), rgba(79, 141, 255, 0.121));
+  border:1px solid var(--border); border-radius:12px;
+  padding:14px; margin-bottom:10px; text-align:center;
+}
+.big-stat-val { font-size:32px; font-weight:800; font-family:'Syne',sans-serif; color:var(--accent); }
+.big-stat-lbl { font-size:12px; color:var(--muted); margin-top:2px; }
+.progress-item { margin-bottom:10px; }
+.progress-label { display:flex; justify-content:space-between; font-size:11px; margin-bottom:4px; }
+.progress-label span:first-child { color:var(--text); }
+.progress-label span:last-child { color:var(--accent); font-family:'JetBrains Mono',monospace; }
+.progress-track { height:6px; background:var(--border); border-radius:3px; overflow:hidden; }
+.progress-fill { height:100%; border-radius:3px; transition:width 1s cubic-bezier(.4,0,.2,1); }
+</style>
+</head>
+<body>
+
+<!-- 3D BACKGROUND CANVAS -->
+<canvas id="three-canvas"></canvas>
+
+<!-- HEADER -->
+<header>
+  <div class="logo">
+    <div class="logo-icon">🌍</div>
+    <div class="brand">
+      <h1>SoilSense<span style="color:var(--accent)">3D</span></h1>
+      <p>Agricultural Soil Intelligence Platform</p>
+    </div>
+  </div>
+  <div class="header-stats">
+    <div class="hstat"><div class="hstat-val" id="h-total">18</div><div class="hstat-lbl">عينات</div></div>
+    <div class="hstat"><div class="hstat-val" id="h-ec">—</div><div class="hstat-lbl">متوسط EC</div></div>
+    <div class="hstat"><div class="hstat-val" id="h-ph">—</div><div class="hstat-lbl">متوسط pH</div></div>
+    <div class="hstat"><div class="hstat-val" id="h-area">971.6</div><div class="hstat-lbl">فدان كُلي</div></div>
+  </div>
+  <div class="location-pill">
+    <div class="pulse-dot"></div>
+    📍 زهور الأمراء · الدلنجات · البحيرة
+  </div>
+</header>
+
+<div class="main">
+  <!-- SIDEBAR -->
+  <div class="sidebar">
+    <div class="sidebar-tabs">
+      <button class="tab-btn active" onclick="switchTab('list')">🗂️ العينات</button>
+      <button class="tab-btn" onclick="switchTab('detail')">🔬 التفاصيل</button>
+      <button class="tab-btn" onclick="switchTab('stats')">📊 الإحصاء</button>
+      <button class="tab-btn" onclick="switchTab('add')">➕ إضافة</button>
+    </div>
+
+    <!-- LIST TAB -->
+    <div class="tab-content active" id="tab-list">
+      <div class="sample-list" id="sample-list"></div>
+    </div>
+
+    <!-- DETAIL TAB -->
+    <div class="tab-content" id="tab-detail">
+      <div id="detail-placeholder" class="placeholder-msg">
+        <div class="big-icon">🔬</div>
+        <p>اضغط على أي نقطة في الخريطة<br>أو على عينة من القائمة</p>
+      </div>
+      <div id="detail-panel" class="detail-panel" style="display:none"></div>
+    </div>
+
+    <!-- STATS TAB -->
+    <div class="tab-content" id="tab-stats">
+      <div class="stats-panel" id="stats-panel"></div>
+    </div>
+
+    <!-- ADD TAB -->
+    <div class="tab-content" id="tab-add">
+      <div class="add-form" id="add-form">
+        <div class="section-title">📍 الإحداثيات</div>
+        <div class="form-row">
+          <div class="form-group"><label>خط العرض N</label><input type="number" id="f-lat" step="0.0001" placeholder="30.7540"></div>
+          <div class="form-group"><label>خط الطول E</label><input type="number" id="f-lon" step="0.0001" placeholder="30.5460"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>العمق (cm)</label><input type="number" id="f-depth" step="1" placeholder="100"></div>
+          <div class="form-group"><label>الارتفاع (m)</label><input type="number" id="f-elev" step="0.1" placeholder="6.0"></div>
+        </div>
+        <div class="section-title">⚗️ الخواص الكيميائية</div>
+        <div class="form-row">
+          <div class="form-group"><label>pH</label><input type="number" id="f-ph" step="0.1" placeholder="8.0"></div>
+          <div class="form-group"><label>EC (ds/m)</label><input type="number" id="f-ec" step="0.01" placeholder="0.5"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>CaCO3 %</label><input type="number" id="f-caco3" step="0.01" placeholder="4.0"></div>
+          <div class="form-group"><label>O.M %</label><input type="number" id="f-om" step="0.001" placeholder="1.0"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>N (ppm)</label><input type="number" id="f-tan" step="0.1" placeholder="100"></div>
+          <div class="form-group"><label>P (ppm)</label><input type="number" id="f-tap" step="0.1" placeholder="20"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>K (mg/kg)</label><input type="number" id="f-k" step="1" placeholder="1000"></div>
+          <div class="form-group"><label>SAR</label><input type="number" id="f-sar" step="0.01" placeholder="2.0"></div>
+        </div>
+        <div class="form-group">
+          <label>نوع التربة</label>
+          <select id="f-texture">
+            <option value="sand">رملية (sand)</option>
+            <option value="loamy sand">رملية طينية (loamy sand)</option>
+            <option value="sandy loam">طينية رملية (sandy loam)</option>
+            <option value="loam">طمي (loam)</option>
+            <option value="clay loam">طيني طمي (clay loam)</option>
+          </select>
+        </div>
+        <button class="btn-add" onclick="addNewSample()">➕ إضافة النقطة</button>
+        <div class="form-msg" id="form-msg"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAP WRAPPER -->
+  <div class="map-wrap">
+    <div id="map"></div>
+
+    <!-- Layer Control -->
+    <div class="layer-control">
+      <div class="layer-title">🎨 طبقة التصوير</div>
+      <label class="layer-opt"><input type="radio" name="layer" value="ec" checked> الملوحة EC</label>
+      <label class="layer-opt"><input type="radio" name="layer" value="ph"> الحموضة pH</label>
+      <label class="layer-opt"><input type="radio" name="layer" value="om"> المادة العضوية</label>
+      <label class="layer-opt"><input type="radio" name="layer" value="caco3"> كربونات الكالسيوم</label>
+      <label class="layer-opt"><input type="radio" name="layer" value="sar"> نسبة الصوديوم SAR</label>
+      <label class="layer-opt"><input type="radio" name="layer" value="tan"> نيتروجين N</label>
+      <label class="layer-opt"><input type="radio" name="layer" value="tap"> فوسفور P</label>
+    </div>
+
+    <!-- Map Type Switcher -->
+    <div style="position:absolute;top:14px;left:14px;z-index:800;display:flex;gap:6px">
+      <button class="maptype-btn active" data-type="satellite" onclick="switchBaseMap('satellite')"
+        style="padding:7px 13px;border-radius:8px;border:1px solid rgba(0,229,176,.4);background:rgba(0,229,176,.15);color:#00e5b0;font-family:'Cairo',sans-serif;font-size:12px;font-weight:700;cursor:pointer;transition:all .2s;backdrop-filter:blur(8px)">🛰️ صور جوية</button>
+      <button class="maptype-btn" data-type="topo" onclick="switchBaseMap('topo')"
+        style="padding:7px 13px;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:rgba(4,8,15,.8);color:#64748b;font-family:'Cairo',sans-serif;font-size:12px;font-weight:700;cursor:pointer;transition:all .2s;backdrop-filter:blur(8px)">🗺️ طبوغرافي</button>
+      <button class="maptype-btn" data-type="osm" onclick="switchBaseMap('osm')"
+        style="padding:7px 13px;border-radius:8px;border:1px solid rgba(255,255,255,.15);background:rgba(4,8,15,.8);color:#64748b;font-family:'Cairo',sans-serif;font-size:12px;font-weight:700;cursor:pointer;transition:all .2s;backdrop-filter:blur(8px)">🗾 خريطة عادية</button>
+    </div>
+
+    <!-- Legend -->
+    <div class="legend-bar" id="legend-bar"></div>
+  </div>
+</div>
+
+<style>
+.maptype-btn.active { background:rgba(0,229,176,.2) !important; border-color:rgba(0,229,176,.6) !important; color:#00e5b0 !important; box-shadow:0 0 14px rgba(0,229,176,.25); }
+</style>
+
+<script>
+// ════════════════════════════════════════════════════
+//  THREE.JS 3D BACKGROUND
+// ════════════════════════════════════════════════════
+(function() {
+  const canvas = document.getElementById('three-canvas');
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  renderer.setPixelRatio(window.devicePixelRatio);
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setClearColor(0x000000, 0);
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+  camera.position.set(0, 30, 60);
+  camera.lookAt(0, 0, 0);
+
+  // Ground terrain mesh (simulating soil elevation map)
+  const geo = new THREE.PlaneGeometry(120, 80, 60, 40);
+  const positions = geo.attributes.position;
+  for (let i = 0; i < positions.count; i++) {
+    const x = positions.getX(i);
+    const y = positions.getY(i);
+    const z = Math.sin(x * 0.08) * Math.cos(y * 0.12) * 3.5
+            + Math.sin(x * 0.2 + 1) * Math.cos(y * 0.15) * 1.5
+            + (Math.random() - 0.5) * 0.8;
+    positions.setZ(i, z);
+  }
+  geo.computeVertexNormals();
+
+  // Wireframe overlay
+  const wireMat = new THREE.MeshBasicMaterial({
+    color: 0x00e5b0, wireframe: true, opacity: 0.18, transparent: true
+  });
+  const wireMesh = new THREE.Mesh(geo, wireMat);
+  wireMesh.rotation.x = -Math.PI / 2.4;
+  wireMesh.position.y = -12;
+  scene.add(wireMesh);
+
+  // Solid fill
+  const solidMat = new THREE.MeshLambertMaterial({
+    color: 0x071830, opacity: 0.6, transparent: true, side: THREE.DoubleSide
+  });
+  const solidMesh = new THREE.Mesh(geo.clone(), solidMat);
+  solidMesh.rotation.x = -Math.PI / 2.4;
+  solidMesh.position.y = -12;
+  scene.add(solidMesh);
+
+  // Sample points as 3D spheres
+  const samplePositions = [
+    [-8, 2, -6], [-4, 3, -2], [0, 2.5, 0], [4, 3, -4],
+    [8, 1.5, 2], [-6, 2, 4], [2, 3.5, 6], [6, 2, 4],
+    [-2, 2.8, -8], [10, 2, -2], [-10, 1.5, 0], [8, 3, -8],
+    [12, 2.5, 4], [-4, 2, 8], [14, 1.8, 0], [16, 2.2, -4],
+    [0, 3, 10], [-8, 2.5, -4]
+  ];
+
+  const dotColors = [0x22c55e, 0x00e5b0, 0xf5a623, 0xff3d57, 0x4f8eff];
+  samplePositions.forEach((pos, i) => {
+    const r = 0.4 + Math.random() * 0.3;
+    const sg = new THREE.SphereGeometry(r, 8, 8);
+    const sm = new THREE.MeshBasicMaterial({
+      color: dotColors[i % dotColors.length],
+      opacity: 0.8 + Math.random() * 0.2, transparent: true
+    });
+    const sphere = new THREE.Mesh(sg, sm);
+    sphere.position.set(pos[0], pos[1] - 10, pos[2]);
+    scene.add(sphere);
+
+    // Glow ring
+    const rg = new THREE.RingGeometry(r + 0.3, r + 0.7, 16);
+    const rm = new THREE.MeshBasicMaterial({
+      color: dotColors[i % dotColors.length], side: THREE.DoubleSide,
+      opacity: 0.3, transparent: true
+    });
+    const ring = new THREE.Mesh(rg, rm);
+    ring.rotation.x = -Math.PI / 2.4;
+    ring.position.set(pos[0], pos[1] - 10.5, pos[2]);
+    scene.add(ring);
+  });
+
+  // Vertical scan lines
+  for (let i = 0; i < 5; i++) {
+    const lg = new THREE.BufferGeometry();
+    const x = -20 + i * 10;
+    const pts = [];
+    for (let z = -40; z <= 40; z += 2) {
+      pts.push(x, -5, z);
+    }
+    lg.setAttribute('position', new THREE.Float32BufferAttribute(pts, 3));
+    const lm = new THREE.LineBasicMaterial({ color: 0x4f8eff, opacity: 0.12, transparent: true });
+    scene.add(new THREE.Line(lg, lm));
+  }
+
+  // Lighting
+  scene.add(new THREE.AmbientLight(0x0d2040, 2));
+  const dLight = new THREE.DirectionalLight(0x00e5b0, 1);
+  dLight.position.set(10, 20, 10);
+  scene.add(dLight);
+  const pLight = new THREE.PointLight(0x4f8eff, 1.5, 80);
+  pLight.position.set(-20, 10, 0);
+  scene.add(pLight);
+
+  let t = 0;
+  function animate() {
+    requestAnimationFrame(animate);
+    t += 0.003;
+    wireMesh.rotation.z = Math.sin(t * 0.5) * 0.02;
+    solidMesh.rotation.z = wireMesh.rotation.z;
+    camera.position.x = Math.sin(t * 0.3) * 8;
+    camera.position.z = 60 + Math.sin(t * 0.2) * 5;
+    camera.lookAt(0, -5, 0);
+    renderer.render(scene, camera);
+  }
+  animate();
+
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+})();
+
+// ════════════════════════════════════════════════════
+//  DATA
+// ════════════════════════════════════════════════════
+const SAMPLES = [
+  {"id":1,"lat":30.739531,"lon":30.541652,"depth":72,"elev":7.28,"pH":8.1,"EC":0.908,"Na":2.934,"K_meq":0.256,"Ca":3,"Mg":3,"Cl":2.2,"HCO3":0.24,"SO4":6.64,"CaCO3":3.72,"OM":0.1006,"TAN":107.41,"TAP":1.2,"K_mg":900,"silt":2,"clay":6,"sand":92,"texture":"sand","SAR":1.69,"area_fed":30.40,"area_pct":3.13},
+  {"id":2,"lat":30.743939,"lon":30.536322,"depth":100,"elev":7.74,"pH":8.2,"EC":0.375,"Na":0.869,"K_meq":0.192,"Ca":1,"Mg":2,"Cl":2.2,"HCO3":0.16,"SO4":1.39,"CaCO3":4.13,"OM":1.34,"TAN":311.02,"TAP":4.0,"K_mg":300,"silt":4,"clay":10,"sand":86,"texture":"loamy sand","SAR":0.71,"area_fed":62.25,"area_pct":6.41},
+  {"id":3,"lat":30.744031,"lon":30.541539,"depth":94,"elev":6.61,"pH":8.7,"EC":0.614,"Na":2.826,"K_meq":0.384,"Ca":1,"Mg":2,"Cl":3,"HCO3":0.32,"SO4":2.82,"CaCO3":4.13,"OM":1.123,"TAN":81.26,"TAP":1.2,"K_mg":550,"silt":6,"clay":10,"sand":84,"texture":"loamy sand","SAR":2.31,"area_fed":55.88,"area_pct":5.75},
+  {"id":4,"lat":30.748447,"lon":30.536206,"depth":140,"elev":5.63,"pH":8.4,"EC":0.905,"Na":3.913,"K_meq":0.769,"Ca":3,"Mg":2,"Cl":3.6,"HCO3":0.16,"SO4":5.29,"CaCO3":4.4,"OM":1.04,"TAN":397.88,"TAP":26.6,"K_mg":1600,"silt":4,"clay":10,"sand":86,"texture":"loamy sand","SAR":2.47,"area_fed":64.62,"area_pct":6.65},
+  {"id":5,"lat":30.747686,"lon":30.541425,"depth":85,"elev":5.91,"pH":10.8,"EC":12.2,"Na":100,"K_meq":7.6,"Ca":3,"Mg":3,"Cl":33.33,"HCO3":1.84,"SO4":86.83,"CaCO3":6.61,"OM":1.07,"TAN":456.73,"TAP":11.2,"K_mg":1850,"silt":4,"clay":6,"sand":90,"texture":"sand","SAR":57.74,"area_fed":50.56,"area_pct":5.20},
+  {"id":6,"lat":30.748644,"lon":30.546644,"depth":135,"elev":6.32,"pH":8.6,"EC":1.153,"Na":4.347,"K_meq":3.076,"Ca":2,"Mg":2,"Cl":4,"HCO3":0.8,"SO4":6.73,"CaCO3":5.37,"OM":1.408,"TAN":226.96,"TAP":48.6,"K_mg":1650,"silt":6,"clay":12,"sand":82,"texture":"sandy loam","SAR":3.07,"area_fed":59.52,"area_pct":6.13},
+  {"id":7,"lat":30.753053,"lon":30.541311,"depth":142,"elev":5.0,"pH":8.3,"EC":0.704,"Na":1.304,"K_meq":1.66,"Ca":2,"Mg":3,"Cl":2,"HCO3":0.32,"SO4":4.72,"CaCO3":6.47,"OM":0.5366,"TAN":395.08,"TAP":60.6,"K_mg":450,"silt":2,"clay":10,"sand":88,"texture":"loamy sand","SAR":0.82,"area_fed":28.43,"area_pct":2.93},
+  {"id":8,"lat":30.753153,"lon":30.546531,"depth":110,"elev":5.45,"pH":8.1,"EC":1.328,"Na":4.782,"K_meq":null,"Ca":6,"Mg":2,"Cl":2.2,"HCO3":0.4,"SO4":10.68,"CaCO3":4.13,"OM":1.073,"TAN":78.46,"TAP":14.6,"K_mg":1000,"silt":4,"clay":8,"sand":88,"texture":"sand","SAR":2.39,"area_fed":68.35,"area_pct":7.03},
+  {"id":9,"lat":30.757561,"lon":30.541194,"depth":130,"elev":6.36,"pH":8.3,"EC":0.928,"Na":3.804,"K_meq":0.128,"Ca":3,"Mg":2,"Cl":null,"HCO3":0.32,"SO4":6.76,"CaCO3":6.88,"OM":1.24,"TAN":56.04,"TAP":14.4,"K_mg":600,"silt":6,"clay":6,"sand":88,"texture":"sand","SAR":2.41,"area_fed":77.45,"area_pct":7.97},
+  {"id":10,"lat":30.757642,"lon":30.546414,"depth":150,"elev":6.63,"pH":8.9,"EC":0.56,"Na":2.717,"K_meq":0.769,"Ca":1,"Mg":1,"Cl":1.6,"HCO3":0.4,"SO4":3.6,"CaCO3":8.26,"OM":0.939,"TAN":221.36,"TAP":35.2,"K_mg":1450,"silt":4,"clay":10,"sand":86,"texture":"loamy sand","SAR":2.72,"area_fed":44.95,"area_pct":4.63},
+  {"id":11,"lat":30.757758,"lon":30.551636,"depth":134,"elev":5.59,"pH":8.4,"EC":0.397,"Na":1.195,"K_meq":0.705,"Ca":1,"Mg":1,"Cl":1.4,"HCO3":0.4,"SO4":2.17,"CaCO3":3.72,"OM":1.274,"TAN":30.82,"TAP":5.2,"K_mg":2000,"silt":4,"clay":7,"sand":89,"texture":"sand","SAR":1.20,"area_fed":54.22,"area_pct":5.58},
+  {"id":12,"lat":30.762167,"lon":30.5463,"depth":145,"elev":6.97,"pH":8.1,"EC":1.182,"Na":1.522,"K_meq":3.841,"Ca":3,"Mg":2,"Cl":1.4,"HCO3":0.48,"SO4":9.94,"CaCO3":6.19,"OM":1.492,"TAN":442.72,"TAP":107.4,"K_mg":2450,"silt":4,"clay":5,"sand":91,"texture":"sand","SAR":0.96,"area_fed":59.76,"area_pct":6.15},
+  {"id":13,"lat":30.762267,"lon":30.551522,"depth":121,"elev":6.76,"pH":8.5,"EC":0.458,"Na":1.956,"K_meq":0.448,"Ca":1,"Mg":1,"Cl":2,"HCO3":0.4,"SO4":2.18,"CaCO3":3.17,"OM":0.737,"TAN":33.62,"TAP":16.2,"K_mg":2150,"silt":4,"clay":3,"sand":93,"texture":"sand","SAR":1.96,"area_fed":71.65,"area_pct":7.37},
+  {"id":14,"lat":30.766675,"lon":30.546186,"depth":130,"elev":6.17,"pH":8.0,"EC":0.582,"Na":1.195,"K_meq":0.641,"Ca":2,"Mg":1,"Cl":1,"HCO3":0.32,"SO4":4.5,"CaCO3":2.75,"OM":0.654,"TAN":25.22,"TAP":52,"K_mg":1400,"silt":4,"clay":7,"sand":89,"texture":"sand","SAR":0.98,"area_fed":40.77,"area_pct":4.20},
+  {"id":15,"lat":30.766772,"lon":30.551406,"depth":150,"elev":6.49,"pH":8.0,"EC":0.442,"Na":0.869,"K_meq":0.705,"Ca":2,"Mg":1,"Cl":1.2,"HCO3":0.32,"SO4":2.9,"CaCO3":3.44,"OM":1.727,"TAN":212.95,"TAP":71,"K_mg":3150,"silt":6,"clay":5,"sand":89,"texture":"sand","SAR":0.71,"area_fed":65.80,"area_pct":6.77},
+  {"id":16,"lat":30.766872,"lon":30.556628,"depth":140,"elev":6.36,"pH":8.3,"EC":0.276,"Na":0.76,"K_meq":1.346,"Ca":1,"Mg":1,"Cl":2.2,"HCO3":0.24,"SO4":0.32,"CaCO3":2.75,"OM":0.57,"TAN":30.82,"TAP":11,"K_mg":1150,"silt":2,"clay":6,"sand":92,"texture":"sand","SAR":0.76,"area_fed":55.30,"area_pct":5.69},
+  {"id":17,"lat":30.770211,"lon":30.549975,"depth":150,"elev":6.33,"pH":8.0,"EC":0.358,"Na":0.869,"K_meq":0.32,"Ca":1,"Mg":2,"Cl":2.4,"HCO3":0.4,"SO4":0.78,"CaCO3":1.38,"OM":2.146,"TAN":25.22,"TAP":55,"K_mg":1150,"silt":8,"clay":8,"sand":84,"texture":"loamy sand","SAR":0.71,"area_fed":47.17,"area_pct":4.85},
+  {"id":18,"lat":30.741078,"lon":30.537725,"depth":107,"elev":7.12,"pH":7.9,"EC":4.79,"Na":12.17,"K_meq":0.892,"Ca":22,"Mg":10,"Cl":2.2,"HCO3":0.56,"SO4":45.14,"CaCO3":5.92,"OM":1.039,"TAN":128.89,"TAP":1.2,"K_mg":1450,"silt":6,"clay":16,"sand":78,"texture":"sandy loam","SAR":3.04,"area_fed":34.54,"area_pct":3.55},
+];
+
+// Crop suitability per sample
+const CROP_SUIT = {
+  1:  {Wheat:'S3(t)',Faba:'S3(t)',Sugar:'S2(t)',Sunflower:'S4(dp,t,temp)',Maize:'S3(t)',Peanut:'NS2(sd)',Banana:'S3(dp,t,temp)',Grape:'NS2(sd)',Olive:'NS2(sd)',Fig:'NS2(sd)',Date:'S2(t)',Onion:'S2(t)',Cabbage:'S2(t)',Potato:'S2(t)',Tomato:'S2(t)',Watermelon:'S2(t)',Alfalfa:'S2(t)'},
+  2:  {Wheat:'S2(t)',Faba:'S2(t)',Sugar:'S2(t)',Sunflower:'S3(t,temp)',Maize:'S2(t)',Peanut:'S3(dp,t)',Banana:'S3(temp)',Grape:'S2(dp)',Olive:'S2(dp)',Fig:'S2(dp)',Date:'S2(t)',Onion:'S2(t)',Cabbage:'S2(t)',Potato:'S1',Tomato:'S2',Watermelon:'S2',Alfalfa:'S2'},
+  3:  {Wheat:'S2(t)',Faba:'S2(t)',Sugar:'S2(t)',Sunflower:'S3(t,temp)',Maize:'S2(t)',Peanut:'S2(t)',Banana:'S2(temp)',Grape:'S1',Olive:'S2',Fig:'S2',Date:'S2(t)',Onion:'S2(t)',Cabbage:'S2(t)',Potato:'S1',Tomato:'S2',Watermelon:'S2',Alfalfa:'S2'},
+  4:  {Wheat:'S1',Faba:'S1',Sugar:'S1',Sunflower:'S2(temp)',Maize:'S1',Peanut:'S2',Banana:'S2(temp)',Grape:'S1',Olive:'S2',Fig:'S2',Date:'S1',Onion:'S1',Cabbage:'S1',Potato:'S2',Tomato:'S2',Watermelon:'S2',Alfalfa:'S2'},
+  5:  {Wheat:'S2(t)',Faba:'S2(t)',Sugar:'S2(t)',Sunflower:'S4(dp,t,temp)',Maize:'S2(t)',Peanut:'S2(t)',Banana:'S2(temp)',Grape:'S1',Olive:'S2',Fig:'S2',Date:'S2(t)',Onion:'S2(t)',Cabbage:'S2(t)',Potato:'S1',Tomato:'S2',Watermelon:'S2',Alfalfa:'S2'},
+  6:  {Wheat:'S3(t)',Faba:'S4(ece,t)',Sugar:'S3(t)',Sunflower:'S4(dp,t,temp)',Maize:'S4(ece,t)',Peanut:'NS2(sd)',Banana:'NS1(ece,dp,t,temp)',Grape:'NS2(sd)',Olive:'NS2(sd)',Fig:'NS2(sd)',Date:'S4(ece,t)',Onion:'S4(ece,t)',Cabbage:'S4(ece,t)',Potato:'S4(ece,t)',Tomato:'S3(ece,t)',Watermelon:'S4(ece,t)',Alfalfa:'S3(ece,t)'},
+  7:  {Wheat:'S2(t)',Faba:'S3(ece,t)',Sugar:'S1(t)',Sunflower:'S3(t,temp)',Maize:'S2(t)',Peanut:'S3(t)',Banana:'S3(temp)',Grape:'S1',Olive:'S2',Fig:'S2',Date:'S3(ece,t)',Onion:'S2(t)',Cabbage:'S2(t)',Potato:'S1',Tomato:'S2',Watermelon:'S2',Alfalfa:'S2'},
+  8:  {Wheat:'S2(t)',Faba:'S3(t)',Sugar:'S2(t)',Sunflower:'S3(t,temp)',Maize:'S2(t)',Peanut:'S3(t)',Banana:'S3(temp)',Grape:'S2',Olive:'S2',Fig:'S2',Date:'S2(t)',Onion:'S2(t)',Cabbage:'S2(t)',Potato:'S1',Tomato:'S2',Watermelon:'S2',Alfalfa:'S2'},
+  9:  {Wheat:'S2(t)',Faba:'S2(t)',Sugar:'S2(t)',Sunflower:'S3(t,temp)',Maize:'S2(t)',Peanut:'S2(t)',Banana:'S2(temp)',Grape:'S1',Olive:'S2',Fig:'S2',Date:'S2(t)',Onion:'S2(t)',Cabbage:'S2(t)',Potato:'S1',Tomato:'S2',Watermelon:'S2',Alfalfa:'S2'},
+  10: {Wheat:'S2(t)',Faba:'S2(t)',Sugar:'S2(t)',Sunflower:'S3(t,temp)',Maize:'S2(t)',Peanut:'S2(t)',Banana:'S2(t,temp)',Grape:'S1(t)',Olive:'S2(t)',Fig:'S2(t)',Date:'S2(t)',Onion:'S2(t)',Cabbage:'S2(t)',Potato:'S1(t)',Tomato:'S2(t)',Watermelon:'S2(t)',Alfalfa:'S2(t)'},
+  11: {Wheat:'S2(t)',Faba:'S3(t)',Sugar:'S2(t)',Sunflower:'S3(t,temp)',Maize:'S2(t)',Peanut:'S3(t)',Banana:'S3(t,temp)',Grape:'S2(t)',Olive:'S2(t)',Fig:'S2(t)',Date:'S2(t)',Onion:'S2(t)',Cabbage:'S2(t)',Potato:'S2(t)',Tomato:'S2(t)',Watermelon:'S2(t)',Alfalfa:'S2(t)'},
+  12: {Wheat:'S2(t)',Faba:'S2(t)',Sugar:'S2(t)',Sunflower:'S3(t,temp)',Maize:'S2(t)',Peanut:'S2(t)',Banana:'S2(temp)',Grape:'S1',Olive:'S1',Fig:'S1',Date:'S2(t)',Onion:'S2(t)',Cabbage:'S2(t)',Potato:'S1',Tomato:'S2',Watermelon:'S2',Alfalfa:'S2'},
+  13: {Wheat:'S2(t)',Faba:'S3(t)',Sugar:'S2(t)',Sunflower:'S3(t,temp)',Maize:'S3(t)',Peanut:'S3(t)',Banana:'S3(t,temp)',Grape:'S2(t)',Olive:'S2(t)',Fig:'S2(t)',Date:'S2(t)',Onion:'S2(t)',Cabbage:'S2(t)',Potato:'S2(t)',Tomato:'S2(t)',Watermelon:'S2(t)',Alfalfa:'S2(t)'},
+  14: {Wheat:'S2(t)',Faba:'S2(t)',Sugar:'S2(t)',Sunflower:'S3(t,temp)',Maize:'S2(t)',Peanut:'S2(t)',Banana:'S2(temp)',Grape:'S1',Olive:'S2',Fig:'S2',Date:'S2(t)',Onion:'S2(t)',Cabbage:'S2(t)',Potato:'S1',Tomato:'S2',Watermelon:'S2',Alfalfa:'S2'},
+  15: {Wheat:'S3(t)',Faba:'S3(t)',Sugar:'S3(t)',Sunflower:'S3(t,temp)',Maize:'S3(t)',Peanut:'S3(t)',Banana:'S3(t,temp)',Grape:'S2(t)',Olive:'S3(t)',Fig:'S3(t)',Date:'S3(t)',Onion:'S3(t)',Cabbage:'S3(t)',Potato:'S2(t)',Tomato:'S3(t)',Watermelon:'S3(t)',Alfalfa:'S3(t)'},
+  16: {Wheat:'S2(t)',Faba:'S3(t)',Sugar:'S2(t)',Sunflower:'S3(t,temp)',Maize:'S3(t)',Peanut:'S3(t)',Banana:'S3(t,temp)',Grape:'S1(t)',Olive:'S2(t)',Fig:'S2(t)',Date:'S2(t)',Onion:'S2(t)',Cabbage:'S2(t)',Potato:'S2(t)',Tomato:'S2(t)',Watermelon:'S2(t)',Alfalfa:'S2(t)'},
+  17: {Wheat:'S2(t)',Faba:'S2(t)',Sugar:'S2(t)',Sunflower:'S3(t,temp)',Maize:'S2(t)',Peanut:'S3(t)',Banana:'S2(t,temp)',Grape:'S1(t)',Olive:'S2(t)',Fig:'S2(t)',Date:'S2(t)',Onion:'S2(t)',Cabbage:'S2(t)',Potato:'S1(t)',Tomato:'S2(t)',Watermelon:'S2(t)',Alfalfa:'S2(t)'},
+  18: {Wheat:'S2(t)',Faba:'S3(t)',Sugar:'S2(t)',Sunflower:'S3(t,temp)',Maize:'S2(t)',Peanut:'S3(t)',Banana:'S3(t,temp)',Grape:'S2(t)',Olive:'S2(t)',Fig:'S2(t)',Date:'S2(t)',Onion:'S2(t)',Cabbage:'S2(t)',Potato:'S2(t)',Tomato:'S2(t)',Watermelon:'S2(t)',Alfalfa:'S2(t)'},
+};
+
+const CROP_EMOJI = {Wheat:'🌾',Faba:'🫘',Sugar:'🍬',Sunflower:'🌻',Maize:'🌽',Peanut:'🥜',Banana:'🍌',Grape:'🍇',Olive:'🫒',Fig:'🍈',Date:'🌴',Onion:'🧅',Cabbage:'🥬',Potato:'🥔',Tomato:'🍅',Watermelon:'🍉',Alfalfa:'🌿'};
+
+// Land Use Data
+const LU_DATA = [
+  {year:1972, veg_km2:188.01, veg_pct:35.27, soil_km2:345.08, soil_pct:64.73},
+  {year:1990, veg_km2:246.40, veg_pct:46.22, soil_km2:286.69, soil_pct:53.78},
+  {year:2010, veg_km2:286.96, veg_pct:53.83, soil_km2:246.12, soil_pct:46.17},
+  {year:2025, veg_km2:304.54, veg_pct:57.13, soil_km2:228.55, soil_pct:42.87},
+];
+
+// Crop area distribution
+const CROP_AREA = [
+  {crop:'القمح', icon:'🌾', s1_pct:6.65, s1_fed:64.62, s2_pct:77.32, s2_fed:751.28, s3_pct:16.03, s3_fed:155.73},
+  {crop:'الفول', icon:'🫘', s1_pct:6.65, s1_fed:64.62, s2_pct:45.16, s2_fed:438.80, s3_pct:39.14, s3_fed:380.26},
+  {crop:'بنجر السكر', icon:'🍬', s1_pct:2.93, s1_fed:28.43, s2_pct:77.52, s2_fed:753.25, s3_pct:12.90, s3_fed:125.32},
+  {crop:'دوار الشمس', icon:'🌻', s1_pct:0, s1_fed:0, s2_pct:0, s2_fed:0, s3_pct:84.09, s3_fed:817.08},
+  {crop:'الذرة', icon:'🌽', s1_pct:6.65, s1_fed:64.62, s2_pct:64.26, s2_fed:624.34, s3_pct:22.97, s3_fed:223.15},
+  {crop:'الفول السوداني', icon:'🥜', s1_pct:38.14, s1_fed:370.53, s2_pct:41.58, s2_fed:404.02, s3_pct:13.62, s3_fed:132.40},
+  {crop:'الموز', icon:'🍌', s1_pct:0, s1_fed:0, s2_pct:29.27, s2_fed:284.43, s3_pct:48.41, s3_fed:470.40},
+  {crop:'العنب', icon:'🍇', s1_pct:0, s1_fed:0, s2_pct:35.92, s2_fed:349.05, s3_pct:28.97, s3_fed:281.50},
+  {crop:'الزيتون', icon:'🫒', s1_pct:38.85, s1_fed:377.49, s2_pct:23.28, s2_fed:226.20, s3_pct:22.69, s3_fed:220.60},
+  {crop:'التين', icon:'🍈', s1_pct:6.15, s1_fed:59.76, s2_pct:39.74, s2_fed:386.08, s3_pct:6.77, s3_fed:65.80},
+  {crop:'النخيل', icon:'🌴', s1_pct:6.15, s1_fed:59.76, s2_pct:39.74, s2_fed:386.08, s3_pct:6.77, s3_fed:65.80},
+  {crop:'البصل', icon:'🧅', s1_pct:6.65, s1_fed:64.62, s2_pct:77.52, s2_fed:753.25, s3_pct:2.93, s3_fed:28.43},
+  {crop:'الكابيتا', icon:'🥬', s1_pct:6.65, s1_fed:64.62, s2_pct:80.45, s2_fed:781.68, s3_pct:6.77, s3_fed:65.80},
+  {crop:'البطاطس', icon:'🥔', s1_pct:52.29, s1_fed:508.09, s2_pct:9.48, s2_fed:92.12, s3_pct:32.10, s3_fed:311.90},
+  {crop:'الطماطم', icon:'🍅', s1_pct:52.29, s1_fed:508.09, s2_pct:34.81, s2_fed:338.22, s3_pct:6.77, s3_fed:65.80},
+  {crop:'البطيخ', icon:'🍉', s1_pct:52.29, s1_fed:508.09, s2_pct:34.81, s2_fed:338.22, s3_pct:6.77, s3_fed:65.80},
+  {crop:'البرسيم', icon:'🌿', s1_pct:52.29, s1_fed:508.09, s2_pct:34.81, s2_fed:338.22, s3_pct:6.13, s3_fed:59.52},
+];
+
+// ════════════════════════════════════════════════════
+//  LAYER CONFIG
+// ════════════════════════════════════════════════════
+const LAYERS = {
+  ec:    {key:'EC',   label:'الملوحة EC (ds/m)',    ranges:[0.7,1.5,3],  colors:['#22c55e','#f5a623','#ff3d57','#7c3aed'], legendLabels:['منخفض <0.7','متوسط','مرتفع','حرج >3']},
+  ph:    {key:'pH',   label:'الحموضة pH',            ranges:[7.5,8.5,9],  colors:['#22c55e','#f5a623','#ff3d57','#7c3aed'], legendLabels:['حمضي <7.5','محايد','قلوي','شديد القلوية']},
+  om:    {key:'OM',   label:'المادة العضوية %',       ranges:[0.5,1.0,1.5],colors:['#ff3d57','#f5a623','#22c55e','#4f8eff'], legendLabels:['منخفض جداً','منخفض','متوسط','مرتفع >1.5']},
+  caco3: {key:'CaCO3',label:'كربونات الكالسيوم %',   ranges:[5,10,15],   colors:['#22c55e','#f5a623','#ff3d57','#7c3aed'], legendLabels:['منخفض','متوسط','مرتفع','مفرط >15']},
+  sar:   {key:'SAR',  label:'نسبة الصوديوم SAR',      ranges:[3,9,18],    colors:['#22c55e','#f5a623','#ff3d57','#7c3aed'], legendLabels:['ممتاز <3','جيد','متوسط','رديء >18']},
+  tan:   {key:'TAN',  label:'النيتروجين N (ppm)',     ranges:[50,150,300],colors:['#ff3d57','#f5a623','#22c55e','#4f8eff'], legendLabels:['منخفض','كافٍ','جيد','مرتفع >300']},
+  tap:   {key:'TAP',  label:'الفوسفور P (ppm)',       ranges:[10,25,50],  colors:['#ff3d57','#f5a623','#22c55e','#4f8eff'], legendLabels:['منخفض','متوسط','جيد','مرتفع >50']},
+};
+
+// ════════════════════════════════════════════════════
+//  MAP
+// ════════════════════════════════════════════════════
+const map = L.map('map', { center:[30.754, 30.546], zoom:14, zoomControl:false });
+
+// Base layers
+const satelliteLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}', {
+  attribution: '&copy; Esri World Imagery', maxZoom: 20
+});
+const topoLayer = L.tileLayer('https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; OpenTopoMap', subdomains:'abc', maxZoom:17
+});
+const osmLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+  attribution: '&copy; OpenStreetMap', subdomains:'abc', maxZoom:20
+});
+
+// Labels overlay on satellite
+const labelsLayer = L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}', {
+  maxZoom:20, opacity:0.8
+});
+
+satelliteLayer.addTo(map);
+labelsLayer.addTo(map);
+
+// Map type switcher state
+let currentBase = 'satellite';
+function switchBaseMap(type) {
+  map.removeLayer(satelliteLayer);
+  map.removeLayer(topoLayer);
+  map.removeLayer(osmLayer);
+  map.removeLayer(labelsLayer);
+  currentBase = type;
+  if (type==='satellite') { satelliteLayer.addTo(map); labelsLayer.addTo(map); }
+  else if (type==='topo') { topoLayer.addTo(map); }
+  else { osmLayer.addTo(map); }
+  document.querySelectorAll('.maptype-btn').forEach(b => b.classList.toggle('active', b.dataset.type===type));
+}
+
+L.control.zoom({ position:'bottomright' }).addTo(map);
+
+let markers = [];
+let currentLayer = 'ec';
+let selectedId = null;
+
+function getColor(s, lk) {
+  const cfg = LAYERS[lk]; const v = s[cfg.key];
+  if (v == null) return '#4a6080';
+  const r = cfg.ranges;
+  if (v <= r[0]) return cfg.colors[0];
+  if (v <= r[1]) return cfg.colors[1];
+  if (v <= r[2]) return cfg.colors[2];
+  return cfg.colors[3];
+}
+
+function makeIcon(s, lk) {
+  const color = getColor(s, lk);
+  const sel = s.id === selectedId;
+  const size = sel ? 24 : 18;
+  const ring = sel ? `<circle cx="12" cy="12" r="11" fill="none" stroke="${color}" stroke-width="2.5" opacity="0.6"/>` : '';
+  const glow = sel ? `<circle cx="12" cy="12" r="8" fill="${color}" opacity="0.15"/>` : '';
+  const svg = `<svg width="24" height="24" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+    ${ring}${glow}
+    <circle cx="12" cy="12" r="${size/3}" fill="${color}" stroke="#04080f" stroke-width="2"/>
+    <text x="12" y="16" text-anchor="middle" fill="#000" font-size="9" font-weight="bold" font-family="monospace">${s.id}</text>
+  </svg>`;
+  return L.divIcon({ html:svg, className:'', iconSize:[24,24], iconAnchor:[12,12] });
+}
+
+function buildTooltip(s) {
+  const cfg = LAYERS[currentLayer]; const v = s[cfg.key];
+  return `<div class="tt-title">عينة #${s.id} — ${s.texture}</div>
+  <div class="tt-row"><span>${cfg.label}</span><span class="tt-val">${v!=null?v:'—'}</span></div>
+  <div class="tt-row"><span>EC / pH</span><span class="tt-val">${s.EC} / ${s.pH}</span></div>
+  <div class="tt-row"><span>المساحة</span><span class="tt-val">${s.area_fed} fed (${s.area_pct}%)</span></div>`;
+}
+
+function drawMarkers() {
+  markers.forEach(m => map.removeLayer(m.marker));
+  markers = [];
+  SAMPLES.forEach(s => {
+    const m = L.marker([s.lat, s.lon], { icon:makeIcon(s, currentLayer) })
+      .addTo(map)
+      .bindTooltip(buildTooltip(s), { direction:'top', offset:[0,-8] })
+      .on('click', () => selectSample(s.id));
+    markers.push({ id:s.id, marker:m });
+  });
+}
+
+function refreshMarkers() {
+  markers.forEach(({id,marker}) => {
+    const s = SAMPLES.find(x => x.id===id);
+    if (s) { marker.setIcon(makeIcon(s, currentLayer)); marker.setTooltipContent(buildTooltip(s)); }
+  });
+}
+
+function updateLegend() {
+  const cfg = LAYERS[currentLayer];
+  document.getElementById('legend-bar').innerHTML =
+    `<div class="legend-title">${cfg.label}</div>` +
+    cfg.legendLabels.map((lbl,i) =>
+      `<div class="legend-item"><div class="legend-dot" style="background:${cfg.colors[i]}"></div>${lbl}</div>`
+    ).join('');
+}
+
+// ════════════════════════════════════════════════════
+//  SELECT SAMPLE
+// ════════════════════════════════════════════════════
+function selectSample(id) {
+  selectedId = id;
+  refreshMarkers();
+  const s = SAMPLES.find(x => x.id===id);
+  renderDetail(s);
+  switchTab('detail');
+  document.querySelectorAll('.sample-item').forEach(el => {
+    el.classList.toggle('selected', +el.dataset.id===id);
+  });
+  map.panTo([s.lat, s.lon]);
+}
+
+// ════════════════════════════════════════════════════
+//  DETAIL RENDER
+// ════════════════════════════════════════════════════
+function pct(v, max) { return Math.min(100, Math.round((v/max)*100)); }
+function paramCard(label, value, unit, cls, maxVal) {
+  const bw = maxVal && value!=null ? pct(value,maxVal) : 0;
+  const bc = cls==='good'?'#22c55e':cls==='warn'?'#f5a623':cls==='bad'?'#ff3d57':'#4f8eff';
+  return `<div class="param-card ${cls}">
+    <div class="param-label">${label}</div>
+    <div class="param-value">${value!=null?value:'—'}</div>
+    <div class="param-unit">${unit}</div>
+    ${maxVal?`<div class="param-bar-wrap"><div class="param-bar" style="width:${bw}%;background:${bc}"></div></div>`:''}
+  </div>`;
+}
+
+function cropClass(code) {
+  if (!code) return 'crop-ns';
+  if (code.startsWith('S1')) return 'crop-s1';
+  if (code.startsWith('S2')) return 'crop-s2';
+  if (code.startsWith('S3')) return 'crop-s3';
+  if (code.startsWith('S4')) return 'crop-s4';
+  return 'crop-ns';
+}
+
+function renderDetail(s) {
+  document.getElementById('detail-placeholder').style.display='none';
+  const panel = document.getElementById('detail-panel');
+  panel.style.display='block';
+  const ecCls   = s.EC<=0.7?'good':s.EC<=1.5?'warn':'bad';
+  const phCls   = s.pH>=7.5&&s.pH<=8.5?'good':s.pH<=9?'warn':'bad';
+  const omCls   = s.OM>=1.5?'good':s.OM>=0.5?'warn':'bad';
+  const sarCls  = s.SAR<=3?'good':s.SAR<=9?'warn':'bad';
+  const caco3Cls= s.CaCO3<=5?'good':s.CaCO3<=10?'warn':'bad';
+  const tanCls  = s.TAN>=150?'good':s.TAN>=50?'warn':'bad';
+  const tapCls  = s.TAP>=25?'good':s.TAP>=10?'warn':'bad';
+
+  const crops = CROP_SUIT[s.id] || {};
+  const cropHTML = Object.entries(CROP_EMOJI).map(([crop,emoji]) => {
+    const code = crops[crop]||'—';
+    const cls = cropClass(code);
+    return `<div class="crop-card">
+      <div class="crop-icon">${emoji}</div>
+      <div class="crop-info">
+        <div class="crop-name">${crop}</div>
+        <div class="crop-class ${cls}">${code}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  panel.innerHTML = `
+  <div class="detail-header">
+    <h2>📍 عينة #${s.id}</h2>
+    <p>${s.lat.toFixed(5)}° N &nbsp;|&nbsp; ${s.lon.toFixed(5)}° E</p>
+    <p style="margin-top:4px">العمق: <b style="color:var(--text)">${s.depth} cm</b> &nbsp;|&nbsp; الارتفاع: <b style="color:var(--text)">${s.elev} m</b></p>
+    <p style="margin-top:4px">🪨 <b style="color:var(--accent2)">${s.texture}</b> &nbsp;|&nbsp; 🌾 <b style="color:var(--gold)">${s.area_fed} فدان (${s.area_pct}%)</b></p>
+  </div>
+
+  <div class="section-title">⚗️ الخواص الكيميائية</div>
+  <div class="params-grid">
+    ${paramCard('pH — الحموضة',s.pH,'',phCls,14)}
+    ${paramCard('EC — الملوحة',s.EC,'ds/m',ecCls,15)}
+    ${paramCard('O.M — عضوية',s.OM,'%',omCls,3)}
+    ${paramCard('CaCO3',s.CaCO3,'%',caco3Cls,20)}
+    ${paramCard('SAR',s.SAR,'',sarCls,60)}
+  </div>
+
+  <div class="section-title">🌱 العناصر الغذائية</div>
+  <div class="params-grid">
+    ${paramCard('N — نيتروجين',s.TAN,'ppm',tanCls,500)}
+    ${paramCard('P — فوسفور',s.TAP,'ppm',tapCls,120)}
+    ${paramCard('K — بوتاسيوم',s.K_mg,'mg/kg',s.K_mg>=1000?'good':'warn',3500)}
+  </div>
+
+  <div class="section-title">💧 الأيونات الذائبة</div>
+  <table class="ions-table">
+    <tr><th>الأيون</th><th>meq/l</th><th>التقييم</th></tr>
+    <tr><td>Na⁺</td><td>${s.Na}</td><td><span class="status-badge ${s.Na>5?'status-bad':'status-good'}">${s.Na>5?'مرتفع':'طبيعي'}</span></td></tr>
+    <tr><td>Ca²⁺</td><td>${s.Ca}</td><td><span class="status-badge status-neutral">—</span></td></tr>
+    <tr><td>Mg²⁺</td><td>${s.Mg}</td><td><span class="status-badge status-neutral">—</span></td></tr>
+    <tr><td>Cl⁻</td><td>${s.Cl??'—'}</td><td><span class="status-badge ${s.Cl>10?'status-bad':'status-good'}">${s.Cl>10?'مرتفع':'طبيعي'}</span></td></tr>
+    <tr><td>HCO3⁻</td><td>${s.HCO3}</td><td><span class="status-badge status-neutral">—</span></td></tr>
+    <tr><td>SO4²⁻</td><td>${s.SO4}</td><td><span class="status-badge ${s.SO4>10?'status-warn':'status-good'}">${s.SO4>10?'مراقبة':'طبيعي'}</span></td></tr>
+  </table>
+
+  <div class="section-title">🏔️ القوام (Texture)</div>
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 12px">
+    <div style="display:flex;gap:14px;margin-bottom:8px">
+      <div style="flex:1"><div style="font-size:10px;color:var(--muted);margin-bottom:3px">رمل Sand</div>
+        <div class="param-bar-wrap" style="height:7px"><div class="param-bar" style="width:${s.sand}%;background:#f5a623"></div></div>
+        <div style="font-size:11px;font-family:monospace;margin-top:2px">${s.sand}%</div></div>
+      <div style="flex:1"><div style="font-size:10px;color:var(--muted);margin-bottom:3px">طمي Silt</div>
+        <div class="param-bar-wrap" style="height:7px"><div class="param-bar" style="width:${s.silt*3}%;background:#4f8eff"></div></div>
+        <div style="font-size:11px;font-family:monospace;margin-top:2px">${s.silt}%</div></div>
+      <div style="flex:1"><div style="font-size:10px;color:var(--muted);margin-bottom:3px">طين Clay</div>
+        <div class="param-bar-wrap" style="height:7px"><div class="param-bar" style="width:${s.clay*3}%;background:#8b5cf6"></div></div>
+        <div style="font-size:11px;font-family:monospace;margin-top:2px">${s.clay}%</div></div>
+    </div>
+  </div>
+
+  <div class="section-title">🌾 الصلاحية الزراعية للمحاصيل</div>
+  <div style="margin-bottom:8px;font-size:11px;color:var(--muted)">
+    <span style="color:var(--green)">●</span> S1=ممتاز &nbsp;
+    <span style="color:var(--accent)">●</span> S2=جيد &nbsp;
+    <span style="color:var(--warn)">●</span> S3=متوسط &nbsp;
+    <span style="color:var(--danger)">●</span> S4/NS=غير صالح
+  </div>
+  <div class="crop-grid">${cropHTML}</div>`;
+}
+
+// ════════════════════════════════════════════════════
+//  STATS PANEL
+// ════════════════════════════════════════════════════
+function buildStats() {
+  const el = document.getElementById('stats-panel');
+  const avg = k => (SAMPLES.reduce((s,x)=>s+(x[k]||0),0)/SAMPLES.length).toFixed(2);
+
+  const luRows = LU_DATA.map(d => `
+    <tr>
+      <td>${d.year}</td>
+      <td>${d.veg_km2} km²</td>
+      <td class="lu-veg"><div class="lu-bar-cell"><div class="lu-mini-bar" style="width:${d.veg_pct}%"></div></div> ${d.veg_pct}%</td>
+      <td>${d.soil_km2} km²</td>
+      <td class="lu-soil"><div class="lu-bar-cell"><div class="lu-mini-bar" style="width:${d.soil_pct}%;background:var(--warn)"></div></div> ${d.soil_pct}%</td>
+    </tr>`).join('');
+
+  const cropRows = CROP_AREA.map(c => `
+    <tr>
+      <td>${c.icon} ${c.crop}</td>
+      <td style="color:var(--green)">${c.s1_fed.toFixed(0)}</td>
+      <td style="color:var(--accent)">${c.s2_fed.toFixed(0)}</td>
+      <td style="color:var(--warn)">${c.s3_fed.toFixed(0)}</td>
+    </tr>`).join('');
+
+  const props = [
+    {label:'كربونات Ca', ranges:[1,2,3,4,5], vals:[94.45,167.80,257.93,290.24,161.18], pcts:[9.72,17.27,26.55,29.87,16.59]},
+    {label:'العمق Depth', ranges:[1,2,3,4,5,6,7], vals:[38.29,67.92,122.68,72.18,147.89,339.14,183.50], pcts:[3.94,6.99,12.63,7.43,15.22,34.91,18.89]},
+    {label:'الملوحة EC', ranges:[1,2,3,4], vals:[428.29,322.58,150.19,70.55], pcts:[44.08,33.20,15.46,7.26]},
+  ];
+
+  el.innerHTML = `
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:12px">
+    <div class="big-stat-card"><div class="big-stat-val">${SAMPLES.length}</div><div class="big-stat-lbl">عدد العينات</div></div>
+    <div class="big-stat-card"><div class="big-stat-val">971.6</div><div class="big-stat-lbl">إجمالي الفدادين</div></div>
+    <div class="big-stat-card"><div class="big-stat-val">${avg('EC')}</div><div class="big-stat-lbl">متوسط EC (ds/m)</div></div>
+    <div class="big-stat-card"><div class="big-stat-val">${avg('pH')}</div><div class="big-stat-lbl">متوسط pH</div></div>
+    <div class="big-stat-card"><div class="big-stat-val">${avg('OM')}</div><div class="big-stat-lbl">متوسط O.M %</div></div>
+    <div class="big-stat-card"><div class="big-stat-val">533 km²</div><div class="big-stat-lbl">إجمالي المنطقة</div></div>
+  </div>
+
+  <div class="section-title">🛰️ تغير الغطاء الأرضي 1972–2025</div>
+  <table class="lu-table">
+    <tr><th>السنة</th><th>الغطاء النباتي</th><th>%</th><th>التربة المكشوفة</th><th>%</th></tr>
+    ${luRows}
+  </table>
+
+  <div class="section-title">📈 توزيع المساحة الإنتاجية بالفدان</div>
+  <table class="lu-table">
+    <tr><th>المحصول</th><th style="color:var(--green)">S1 ممتاز</th><th style="color:var(--accent)">S2 جيد</th><th style="color:var(--warn)">S3 متوسط</th></tr>
+    ${cropRows}
+  </table>
+
+  <div class="section-title">🔬 توزيع خصائص التربة (فدان)</div>
+  ${props.map(p => `
+  <div style="margin-bottom:10px">
+    <div style="font-size:11px;font-weight:700;color:var(--accent);margin-bottom:6px">${p.label}</div>
+    ${p.vals.map((v,i) => `
+    <div class="progress-item">
+      <div class="progress-label"><span>فئة ${i+1}</span><span>${v.toFixed(1)} fed (${p.pcts[i].toFixed(1)}%)</span></div>
+      <div class="progress-track"><div class="progress-fill" style="width:${p.pcts[i]}%;background:linear-gradient(90deg,var(--accent),var(--accent2))"></div></div>
+    </div>`).join('')}
+  </div>`).join('')}`;
+}
+
+// ════════════════════════════════════════════════════
+//  SAMPLE LIST
+// ════════════════════════════════════════════════════
+function buildList() {
+  const el = document.getElementById('sample-list');
+  el.innerHTML = SAMPLES.map(s => {
+    const color = getColor(s, currentLayer);
+    const cfg = LAYERS[currentLayer];
+    const v = s[cfg.key];
+    return `<div class="sample-item" data-id="${s.id}" onclick="selectSample(${s.id})">
+      <div class="sample-num" style="background:${color}">${s.id}</div>
+      <div class="sample-info">
+        <h4>عينة #${s.id} — ${s.texture}</h4>
+        <p>pH: ${s.pH} | EC: ${s.EC} | OM: ${s.OM}%</p>
+      </div>
+      <div class="sample-badge" style="background:${color}22;color:${color}">${v!=null?v:'—'}</div>
+    </div>`;
+  }).join('');
+}
+
+// ════════════════════════════════════════════════════
+//  HEADER STATS
+// ════════════════════════════════════════════════════
+function updateStats() {
+  const avg = k => (SAMPLES.reduce((s,x)=>s+(x[k]||0),0)/SAMPLES.length).toFixed(2);
+  document.getElementById('h-total').textContent = SAMPLES.length;
+  document.getElementById('h-ec').textContent = avg('EC');
+  document.getElementById('h-ph').textContent = avg('pH');
+}
+
+// ════════════════════════════════════════════════════
+//  ADD SAMPLE
+// ════════════════════════════════════════════════════
+function addNewSample() {
+  const g = id => parseFloat(document.getElementById(id).value);
+  const gs = id => document.getElementById(id).value;
+  const lat = g('f-lat'), lon = g('f-lon');
+  if (!lat || !lon) { showFormMsg('❌ خط العرض وخط الطول مطلوبان','var(--danger)'); return; }
+  const newId = Math.max(...SAMPLES.map(s=>s.id))+1;
+  const sample = {
+    id:newId, lat, lon,
+    depth:g('f-depth')||null, elev:g('f-elev')||null,
+    pH:g('f-ph')||null, EC:g('f-ec')||null,
+    CaCO3:g('f-caco3')||null, OM:g('f-om')||null,
+    TAN:g('f-tan')||null, TAP:g('f-tap')||null,
+    K_mg:g('f-k')||null, SAR:g('f-sar')||null,
+    texture:gs('f-texture'),
+    Na:null,K_meq:null,Ca:null,Mg:null,Cl:null,HCO3:null,SO4:null,
+    silt:null,clay:null,sand:null,
+    area_fed:0, area_pct:0,
+  };
+  SAMPLES.push(sample);
+  const m = L.marker([lat,lon], {icon:makeIcon(sample,currentLayer)})
+    .addTo(map)
+    .bindTooltip(buildTooltip(sample), {direction:'top',offset:[0,-8]})
+    .on('click', ()=>selectSample(sample.id));
+  markers.push({id:sample.id, marker:m});
+  buildList(); updateStats();
+  showFormMsg('✅ تمت إضافة النقطة!','var(--accent)');
+  document.querySelectorAll('#add-form input').forEach(i=>i.value='');
+  setTimeout(()=>selectSample(newId),500);
+}
+
+function showFormMsg(msg, color) {
+  const el = document.getElementById('form-msg');
+  el.textContent=msg; el.style.color=color;
+  setTimeout(()=>el.textContent='',3000);
+}
+
+// ════════════════════════════════════════════════════
+//  TABS
+// ════════════════════════════════════════════════════
+function switchTab(name) {
+  const tabs = ['list','detail','stats','add'];
+  document.querySelectorAll('.tab-btn').forEach((b,i)=>b.classList.toggle('active',tabs[i]===name));
+  document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+}
+
+// Layer switch
+document.querySelectorAll('input[name="layer"]').forEach(r => {
+  r.addEventListener('change',()=>{
+    currentLayer=r.value; refreshMarkers(); updateLegend(); buildList();
+  });
+});
+
+// ════════════════════════════════════════════════════
+//  INIT
+// ════════════════════════════════════════════════════
+drawMarkers();
+updateLegend();
+buildList();
+updateStats();
+buildStats();
+</script>
+</body>
+</html>
